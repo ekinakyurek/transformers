@@ -568,17 +568,13 @@ class GPTJModel(GPTJPreTrainedModel):
             token_type_ids = token_type_ids.view(-1, input_shape[-1])
 
         if position_ids is not None:
-            position_ids = position_ids.view(-1, input_shape[-1])
+            logger.warning('`position_ids` is incompatible with GPT-J which uses rotary embeddings.')
 
         if past_key_values is None:
             past_length = 0
             past_key_values = tuple([None] * len(self.h))
         else:
             past_length = past_key_values[0][0].size(-2)
-
-        if position_ids is None:
-            position_ids = torch.arange(past_length, input_shape[-1] + past_length, dtype=torch.long, device=device)
-            position_ids = position_ids.unsqueeze(0).view(-1, input_shape[-1])
 
         # Attention mask.
         if attention_mask is not None:
