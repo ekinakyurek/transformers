@@ -25,7 +25,7 @@ def convert_command_factory(args: Namespace):
     Returns: ServeCommand
     """
     return ConvertCommand(
-        args.model_type, args.tf_checkpoint, args.pytorch_dump_output, args.config, args.finetuning_task_name
+        args.model_type, args.tf_checkpoint, args.pytorch_dump_output, args.config, args.finetuning_task_name, args.load_accumulators_instead
     )
 
 
@@ -57,6 +57,9 @@ class ConvertCommand(BaseTransformersCLICommand):
             "--pytorch_dump_output", type=str, required=True, help="Path to the PyTorch saved model output."
         )
         train_parser.add_argument("--config", type=str, default="", help="Configuration file path or folder.")
+        train_parser.add_argument("--load_accumulators_instead", default=False, action='store_true', help="Accumulator weights will be loaded instead of actu\
+al weights."
+        )
         train_parser.add_argument(
             "--finetuning_task_name",
             type=str,
@@ -72,6 +75,7 @@ class ConvertCommand(BaseTransformersCLICommand):
         pytorch_dump_output: str,
         config: str,
         finetuning_task_name: str,
+            load_accumulators_instead: bool,
         *args
     ):
         self._logger = logging.get_logger("transformers-cli/converting")
@@ -82,6 +86,7 @@ class ConvertCommand(BaseTransformersCLICommand):
         self._pytorch_dump_output = pytorch_dump_output
         self._config = config
         self._finetuning_task_name = finetuning_task_name
+        self._load_accumulators_instead = load_accumulators_instead
 
     def run(self):
         if self._model_type == "albert":
@@ -117,7 +122,7 @@ class ConvertCommand(BaseTransformersCLICommand):
             except ImportError:
                 raise ImportError(IMPORT_ERROR_MESSAGE)
 
-            convert_tf_checkpoint_to_pytorch(self._tf_checkpoint, self._config, self._pytorch_dump_output)
+            convert_tf_checkpoint_to_pytorch(self._tf_checkpoint, self._config, self._pytorch_dump_output, self._load_accumulators_instead)
         elif self._model_type == "gpt":
             from ..models.openai.convert_openai_original_tf_checkpoint_to_pytorch import (
                 convert_openai_checkpoint_to_pytorch,

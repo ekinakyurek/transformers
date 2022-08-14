@@ -24,14 +24,14 @@ from transformers.utils import logging
 logging.set_verbosity_info()
 
 
-def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, config_file, pytorch_dump_path):
+def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, config_file, pytorch_dump_path, load_accumulators_instead=False):
     # Initialise PyTorch model
     config = MT5Config.from_json_file(config_file)
     print(f"Building PyTorch model from configuration: {config}")
     model = MT5ForConditionalGeneration(config)
 
     # Load weights from tf checkpoint
-    load_tf_weights_in_t5(model, config, tf_checkpoint_path)
+    load_tf_weights_in_t5(model, config, tf_checkpoint_path, load_accumulators_instead=load_accumulators_instead)
 
     # Save pytorch-model
     print(f"Save PyTorch model to {pytorch_dump_path}")
@@ -55,5 +55,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pytorch_dump_path", default=None, type=str, required=True, help="Path to the output PyTorch model."
     )
+    parser.add_argument(
+        "--load_accumulators_instead", default=False, type=bool, action='store_true', help="Accumulator weights will be loaded instead of actual weights."
+    )
     args = parser.parse_args()
-    convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.config_file, args.pytorch_dump_path)
+    convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.config_file, args.pytorch_dump_path, args.load_accumulators_instead)

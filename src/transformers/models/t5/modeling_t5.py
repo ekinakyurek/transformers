@@ -65,12 +65,59 @@ T5_PRETRAINED_MODEL_ARCHIVE_LIST = [
     # See all T5 models at https://huggingface.co/models?filter=t5
 ]
 
+import numpy as np
+
+def replace_tf_weights_with_accumulators(tf_weights):
+    """Replaces a dict of TF model weights with their corresponding accumulators."""
+    v_accums = {}  # Non-factored accumulator variables.
+    vr_accums = {}  # Row factor for factored accumulator variables.
+    vc_accums = {}  # Column factor for factored accumulator variables.
+    for name, value in tf_weights.items():
+        if name.endswith('_slot_v'):
+            v_accums[name[:-7]] = value
+        elif name.endswith('_slot_vr'):
+            vr_accums[name[:-8]] = value
+        elif name.endswith('_slot_vc'):
+            vc_accums[name[:-8]] = value
+        else:
+            pass  # This is not an accumulator, skip.
+
+    vr_names = set(vr_accums)
+    vc_names = set(vc_accums)
+    v_names = set(v_accums)
+    assert vr_names == vc_names
+
+    accum_names = vr_names.union(v_names)
+    param_names = set(tf_weights)
+
+    # Log the parameters that have no accumulators.
+    for name in param_names - accum_names:
+        logger.info(f"No accumulators found for {name}.")
+
+    new_tf_weights = {}
+
+    # Populate non-factored accumulators.
+    for name, value in v_accums.items():
+        new_tf_weights[name] = value
+
+    # Populate factored accumulators.
+    for name in vc_names:
+        vr = vr_accums[name]
+        vc = vc_accums[name]
+        vr = np.expand_dims(vr, axis=1)  # [m, 1]
+        vc = np.expand_dims(vc, axis=0)  # [1, n]
+        v = vr.dot(vc) / np.sum(vr)  # [m, n]
+        if 'embedding' in name:
+            v = np.transpose(v)
+        new_tf_weights[name] = v
+
+    return new_tf_weights
 
 ####################################################
 # This is a conversion method from TF 1.0 to PyTorch
 # More details: https://medium.com/huggingface/from-tensorflow-to-pytorch-265f40ef2a28
 ####################################################
-def load_tf_weights_in_t5(model, config, tf_checkpoint_path):
+def load_tf_weights_in_t5(model, config, tf_checkpoint_path, load_accumulators_instead=False):
     """Load tf checkpoints in a pytorch model."""
     try:
         import re
@@ -94,6 +141,9 @@ def load_tf_weights_in_t5(model, config, tf_checkpoint_path):
         array = tf.train.load_variable(tf_path, name)
         names.append(name)
         tf_weights[name] = array
+        
+    if load_accumulators_instead:
+        tf_weights = replace_tf_weights_with_accumulators(tf_weights)
 
     for txt_name in names:
         name = txt_name.split("/")
@@ -159,12 +209,13 @@ def load_tf_weights_in_t5(model, config, tf_checkpoint_path):
         if scope_names[0] not in ["kernel", "scale", "embedding"]:
             pointer = getattr(pointer, "weight")
         if scope_names[0] != "embedding":
-            logger.info(f"Transposing numpy weight of shape {array.shape} for {name}")
-            array = np.transpose(array)
+            if len(pointer.shape) == 2 and pointer.shape[0] != pointer.shape[1] and pointer.shape[0] == array.shape[1] and array.shape[0] == pointer.shape[1]:
+                logger.info(f"Transposing numpy weight of shape {array.shape} for {name}")
+                array = np.transpose(array)
         try:
             assert (
                 pointer.shape == array.shape
-            ), f"Pointer shape {pointer.shape} and array shape {array.shape} mismatched"
+            ), f"Pointer shape {pointer.shape} and array shape {array.shape} mismatched, {txt_name}, {m_name}, {scope_names[0]}"
         except AssertionError as e:
             e.args += (pointer.shape, array.shape)
             raise
