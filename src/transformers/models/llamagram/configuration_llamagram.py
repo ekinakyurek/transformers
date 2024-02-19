@@ -94,6 +94,9 @@ class LlamaGramConfig(PretrainedConfig):
             Whether to use a bias in the query, key, value and output projection layers during self-attention.
         attention_dropout (`float`, *optional*, defaults to 0.0):
             The dropout ratio for the attention probabilities.
+        ngram_layers (`Dict`, *optional*, defaults to `{1: (1, False), 2: (2, False), 3: (3, True)}`): Specifies the
+            ngram layers to be used in the model. The dictionary should contain the layer index as the key and a tuple
+            as the value. The tuple should contain the ngram size and a boolean indicating whether to use an MLP layer.
 
     ```python
     >>> from transformers import LlamaGramModel, LlamaGramConfig

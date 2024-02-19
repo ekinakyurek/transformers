@@ -237,6 +237,7 @@ class NgramDecoderLayer(nn.Module):
         """
         Args:
             hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
+            ngram_masks (`torch.FloatTensor`): ngram attention mask of shape `(batch, ngram_size, seq_len, seq_len)`
             attention_mask (`torch.FloatTensor`, *optional*):
                 attention mask of size `(batch_size, sequence_length)` if flash attention is used or `(batch_size, 1,
                 query_sequence_length, key_sequence_length)` if default attention is used.

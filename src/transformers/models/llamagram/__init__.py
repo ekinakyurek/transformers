@@ -52,7 +52,7 @@ else:
 
 if TYPE_CHECKING:
     from .configuration_llamagram import LLAMAGRAM_PRETRAINED_CONFIG_ARCHIVE_MAP, LlamaGramConfig
-    from .tokenization_llama import LlamaTokenizer
+    from ..llama.tokenization_llama import LlamaTokenizer
 
     try:
         if not is_tokenizers_available():
@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     except OptionalDependencyNotAvailable:
         pass
     else:
-        from .tokenization_llama_fast import LlamaTokenizerFast
+        from ..llama.tokenization_llama_fast import LlamaTokenizerFast
 
     try:
         if not is_torch_available():

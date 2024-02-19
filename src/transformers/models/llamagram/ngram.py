@@ -43,6 +43,10 @@ class NgramInfo:
         if causal:
             attention = torch.tril(attention, diagonal=past_seen_tokens)
 
+        # normalize
+        attention = attention.float()
+        attention = attention / (attention.sum(dim=-1, keepdim=True) + 1e-8)
+
         return attention
 
 
