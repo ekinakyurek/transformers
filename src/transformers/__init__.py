@@ -130,6 +130,7 @@ _import_structure = {
     ],
     "models": [],
     # Models
+    "models.llamagram": ["LLAMAGRAM_PRETRAINED_CONFIG_ARCHIVE_MAP", "LlamaGramConfig"],
     "models.albert": ["ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "AlbertConfig"],
     "models.align": [
         "ALIGN_PRETRAINED_CONFIG_ARCHIVE_MAP",
@@ -1148,6 +1149,7 @@ except OptionalDependencyNotAvailable:
     ]
 else:
     # Fast tokenizers structure
+    _import_structure["models.llamagram"].append("LlamaTokenizerFast")
     _import_structure["models.albert"].append("AlbertTokenizerFast")
     _import_structure["models.bart"].append("BartTokenizerFast")
     _import_structure["models.barthez"].append("BarthezTokenizerFast")
@@ -1403,6 +1405,22 @@ else:
     _import_structure["modeling_utils"] = ["PreTrainedModel"]
 
     # PyTorch models structure
+
+    _import_structure["models.llamagram"].extend(
+        [
+            "LLAMAGRAM_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "LlamaGramForMaskedLM",
+            "LlamaGramForCausalLM",
+            "LlamaGramForMultipleChoice",
+            "LlamaGramForQuestionAnswering",
+            "LlamaGramForSequenceClassification",
+            "LlamaGramForTokenClassification",
+            "LlamaGramLayer",
+            "LlamaGramModel",
+            "LlamaGramPreTrainedModel",
+            "load_tf_weights_in_llamagram",
+        ]
+    )
 
     _import_structure["models.albert"].extend(
         [
@@ -4891,6 +4909,7 @@ if TYPE_CHECKING:
         load_tf2_weights_in_pytorch_model,
     )
     from .models.albert import ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, AlbertConfig
+    from .models.llamagram import LLAMAGRAM_PRETRAINED_CONFIG_ARCHIVE_MAP, LlamaGramConfig
     from .models.align import (
         ALIGN_PRETRAINED_CONFIG_ARCHIVE_MAP,
         AlignConfig,
@@ -7581,6 +7600,20 @@ if TYPE_CHECKING:
         )
 
         # PyTorch model imports
+
+        from .models.llamagram import (
+            LLAMAGRAM_PRETRAINED_MODEL_ARCHIVE_LIST,
+            LlamaGramForMaskedLM,
+            LlamaGramForCausalLM,
+            LlamaGramForMultipleChoice,
+            LlamaGramForQuestionAnswering,
+            LlamaGramForSequenceClassification,
+            LlamaGramForTokenClassification,
+            LlamaGramLayer,
+            LlamaGramModel,
+            LlamaGramPreTrainedModel,
+            load_tf_weights_in_llamagram,
+        )
         from .models.seamless_m4t import (
             SEAMLESS_M4T_PRETRAINED_MODEL_ARCHIVE_LIST,
             SeamlessM4TCodeHifiGan,
