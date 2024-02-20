@@ -136,7 +136,7 @@ class LlamaGramConfig(PretrainedConfig):
         rope_scaling=None,
         attention_bias=False,
         attention_dropout=0.0,
-        ngram_layers={1: (1, False), 2: (2, False), 3: (3, True)},
+        ngram_layers={1: (3, True)},
         **kwargs,
     ):
         self.vocab_size = vocab_size

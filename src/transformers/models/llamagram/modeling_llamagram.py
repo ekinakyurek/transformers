@@ -133,16 +133,16 @@ class LlamaDecoderLayer(nn.Module):
 
         return outputs
 
-class NgramAttention(nn.Module):
+class AllGramAttention(nn.Module):
     """
     Ngram attention module
     """
 
-    def __init__(self, config: LlamaGramConfig, n: int, layer_idx: Optional[int] = None):
+    def __init__(self, config: LlamaGramConfig, max_n: int, layer_idx: Optional[int] = None):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
-        self.n = n
+        self.max_n = max_n
         if layer_idx is None:
             logger.warning_once(
                 f"Instantiating {self.__class__.__name__} without passing a `layer_idx` is not recommended and will "
@@ -156,13 +156,13 @@ class NgramAttention(nn.Module):
         self.num_key_value_heads = 1
         self.num_key_value_groups = 1
 
-        self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias=config.attention_bias)
-        self.v_proj = nn.Linear(self.hidden_size, self.hidden_size, bias=config.attention_bias)
+        self.q_proj = nn.Linear(self.hidden_size, self.max_n * self.hidden_size, bias=config.attention_bias)
+        self.v_proj = nn.Linear(self.hidden_size, self.max_n * self.hidden_size, bias=config.attention_bias)
 
     def forward(
         self,
         hidden_states: torch.Tensor,
-        ngram_mask: torch.Tensor,
+        ngram_masks: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_value: Optional[Cache] = None,
@@ -189,15 +189,23 @@ class NgramAttention(nn.Module):
         # value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-        attn_weights = ngram_mask
+
+        attn_weights = ngram_masks.transpose(0, 1)
 
         if attention_mask is not None:  # no matter the length, we just slice it
             if cache_position is not None:
                 causal_mask = attention_mask[:, :, cache_position, : value_states.shape[-2]]
 
-            attn_weights = attn_weights * (causal_mask >= 0).squeeze(1)
+            attn_weights = attn_weights * (causal_mask >= 0)
+
+        value_states = value_states.view(bsz, value_states.shape[1], self.max_n, self.hidden_size).transpose(1, 2)
+        query_states = query_states.view(bsz, query_states.shape[1], self.max_n, self.hidden_size).transpose(1, 2)
 
         attn_output = torch.matmul(attn_weights, value_states) + query_states
+
+        attn_output = attn_output.view(bsz, self.max_n, q_len, self.hidden_size)
+
+        attn_output = attn_output.sum(dim=1)
 
         if attn_output.size() != (bsz, q_len, self.hidden_size):
             raise ValueError(
@@ -210,11 +218,11 @@ class NgramAttention(nn.Module):
         return attn_output, attn_weights, past_key_value
 
 class NgramDecoderLayer(nn.Module):
-    def __init__(self, config: LlamaGramConfig, layer_idx: int, n: int, mlp=False):
+    def __init__(self, config: LlamaGramConfig, layer_idx: int, max_n: int, mlp=False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.n = n
-        self.self_attn = NgramAttention(config=config, n=n, layer_idx=layer_idx)
+        self.max_n = max_n
+        self.self_attn = AllGramAttention(config=config, max_n=max_n, layer_idx=layer_idx)
         if mlp:
             self.mlp = LlamaMLP(config)
         else:
@@ -260,7 +268,7 @@ class NgramDecoderLayer(nn.Module):
         # Self Attention
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
-            ngram_mask=ngram_masks[self.n - 1],
+            ngram_masks=ngram_masks[:self.max_n],
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_value=past_key_value,
@@ -452,8 +460,8 @@ class LlamaGramModel(LlamaGramPreTrainedModel):
 
         def layer_idx_to_layer(layer_idx):
             if layer_idx in config.ngram_layers:
-                n, mlp = config.ngram_layers[layer_idx]
-                return NgramDecoderLayer(config=config, layer_idx=layer_idx, n=n, mlp=mlp)
+                max_n, mlp = config.ngram_layers[layer_idx]
+                return NgramDecoderLayer(config=config, layer_idx=layer_idx, max_n=max_n, mlp=mlp)
             else:
                 return LlamaDecoderLayer(config=config, layer_idx=layer_idx)
 
@@ -475,12 +483,6 @@ class LlamaGramModel(LlamaGramPreTrainedModel):
 
     def set_input_embeddings(self, value):
         self.embed_tokens = value
-
-    def get_ngram_info(self):
-        return self.ngram_info
-
-    def update_ngram_info(self, text):
-        self.ngram_info.compute_all_gram_info(text)
 
     @add_start_docstrings_to_model_forward(LLAMAGRAM_INPUTS_DOCSTRING)
     def forward(
